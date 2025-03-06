@@ -42,12 +42,12 @@ resource "aws_instance" "main" {
     "Name" = "${local.name_prefix}-webapp-${count.index}"
   })
 
- user_data_replace_on_change = true
- 
- user_data = templatefile("./templates/userdata.sh", {
-  playbook_repository = var.playbook_repository
- })
- }
+  user_data_replace_on_change = true
+
+  user_data = templatefile("./templates/userdata.sh", {
+    playbook_repository = var.playbook_repository
+  })
+}
 
 
 resource "null_resource" "webapp" {
