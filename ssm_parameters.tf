@@ -18,11 +18,11 @@ resource "aws_ssm_parameter" "site_name" {
 # Construct ARN for the SSM Parameters explicitly
 data "aws_iam_policy_document" "ssm_access" {
   statement {
-    effect    = "Allow"
-    actions   = ["ssm:GetParameter"]
+    effect  = "Allow"
+    actions = ["ssm:GetParameter"]
     resources = [
-      aws_ssm_parameter.host_list.arn,    # Directly reference ARN here
-      aws_ssm_parameter.site_name.arn     # Directly reference ARN here
+      aws_ssm_parameter.host_list.arn, # Directly reference ARN here
+      aws_ssm_parameter.site_name.arn  # Directly reference ARN here
     ]
   }
 }
