@@ -24,10 +24,10 @@ variable "billing_code" {
   description = "(Required) Billing code for network resources"
 }
 
-# variable "ec2_role_name" {
-#   description = "IAM role name for EC2 instance"
-#   type        = string
-# }
+variable "ec2_role_name" {
+  description = "IAM role name for EC2 instance"
+  type        = string
+}
 
 
 
@@ -46,7 +46,7 @@ variable "instance_type" {
   default     = "t3.micro"
 }
 
-variable "api_key" {
+variable "api_key_secret_key" {
   type        = string
   description = "(Required) secret key for the API key for web app to talk to SaaS platform."
 }
