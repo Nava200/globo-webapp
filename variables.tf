@@ -51,6 +51,11 @@ variable "api_key_secret_key" {
   description = "(Required) secret key for the API key for web app to talk to SaaS platform."
 }
 
+variable "playbook_repository" {
+  type        = string
+  description = "(Required) should be URI "
+}
+
 variable "tfe_organization" {
   type        = string
   description = "(Required) Name of TFC Organization"

@@ -48,6 +48,7 @@ resource "aws_instance" "main" {
     "Name" = "${local.name_prefix}-webapp-${count.index}"
   })
 
+ add-secrets-manager
   # Provisioner Stuff (uncomment if needed)
   connection {
     type        = "ssh"
@@ -76,6 +77,40 @@ resource "aws_instance" "main" {
     host_list_ssm_name  = local.host_list_ssm_name
     site_name_ssm_name  = local.site_name_ssm_name
   })
+
+  user_data_replace_on_change = true
+
+  user_data = templatefile("./templates/userdata.sh", {
+    playbook_repository = var.playbook_repository
+  })
+}
+
+
+resource "null_resource" "webapp" {
+
+  triggers = {
+    webapp_server_count = length(aws_instance.main.*.id)
+    web_server_names    = join(",", aws_instance.main.*.id)
+  }
+
+  provisioner "file" {
+    content = templatefile("./templates/application.config.tpl", {
+      hosts     = aws_instance.main.*.private_dns
+      site_name = "${local.name_prefix}-taco-wagon"
+      api_key   = var.api_key
+    })
+    destination = "/home/ec2-user/application.config"
+  }
+
+  connection {
+    type        = "ssh"
+    user        = "ec2-user"
+    port        = "22"
+    host        = aws_instance.main[0].public_ip
+    private_key = module.ssh_keys.private_key_openssh
+  }
+
+ development
 }
 
 resource "aws_lb" "main" {
