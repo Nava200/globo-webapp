@@ -25,16 +25,25 @@ locals {
 # RESOURCES
 ##################################################################################
 
+
+# resource "aws_iam_instance_profile" "main" {
+#   name = "${local.name_prefix}-webapp"
+#   # role = var.ec2_role_name
+
+#   tags = local.common.tags
+# }
 resource "aws_instance" "main" {
-  count         = length(data.tfe_outputs.networking.nonsensitive_values.public_subnets)
-  ami           = nonsensitive(data.aws_ssm_parameter.amzn2_linux.value)
-  instance_type = var.instance_type
-  subnet_id     = data.tfe_outputs.networking.nonsensitive_values.public_subnets[count.index]
+  count                = length(data.tfe_outputs.networking.nonsensitive_values.public_subnets)
+  ami                  = nonsensitive(data.aws_ssm_parameter.amzn2_linux.value)
+  iam_instance_profile = aws_iam_instance_profile.main.name
+  instance_type        = var.instance_type
+  subnet_id            = data.tfe_outputs.networking.nonsensitive_values.public_subnets[count.index]
   vpc_security_group_ids = [
     aws_security_group.webapp_http_inbound_sg.id,
     aws_security_group.webapp_ssh_inbound_sg.id,
     aws_security_group.webapp_outbound_sg.id,
   ]
+
 
   key_name = module.ssh_keys.key_pair_name
 
@@ -42,26 +51,57 @@ resource "aws_instance" "main" {
     "Name" = "${local.name_prefix}-webapp-${count.index}"
   })
 
-  # Provisioner Stuff
+  #   # Provisioner Stuff
+  #   connection {
+  #     type        = "ssh"
+  #     user        = "ec2-user"
+  #     port        = "22"
+  #     host        = self.public_ip
+  #     private_key = module.ssh_keys.private_key_openssh
+  #   }
+
+  #   provisioner "file" {
+  #     source      = "./templates/userdata.sh"
+  #     destination = "/home/ec2-user/userdata.sh"
+  #   }
+
+  #   provisioner "remote-exec" {
+  #     inline = [
+  #       "chmod +x /home/ec2-user/userdata.sh",
+  #       "sh /home/ec2-user/userdata.sh",
+  #     ]
+  #     on_failure = continue
+  #   }
+  user_data_replace_on_change = true
+  user_data = templatefile("./templates/userdata.sh", {
+    playbook_repository = var.playbook_repository
+  })
+}
+
+
+resource "transfer_data" "webapp" {
+
+  triggers_replace = [
+    length(aws_instance.main.*.id),
+    join(",", aws_instance.main.*.id)
+  ]
+
+
+  provisioner "file" {
+    content = templatefile("./templates/application.config.tpl", {
+      hosts     = aws_instance.main.*.private_dns
+      site_name = "${local.name_prefix}-taco-wagon"
+      api_key   = var.api_key
+    })
+    destination = "/home/ec2-user/application.config"
+  }
+
   connection {
     type        = "ssh"
     user        = "ec2-user"
     port        = "22"
-    host        = self.public_ip
+    host        = aws_instance.main[0].public_ip
     private_key = module.ssh_keys.private_key_openssh
-  }
-
-  provisioner "file" {
-    source      = "./templates/userdata.sh"
-    destination = "/home/ec2-user/userdata.sh"
-  }
-
-  provisioner "remote-exec" {
-    inline = [
-      "chmod +x /home/ec2-user/userdata.sh",
-      "sh /home/ec2-user/userdata.sh",
-    ]
-    on_failure = continue
   }
 
 }
