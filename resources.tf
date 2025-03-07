@@ -11,25 +11,31 @@ provider "aws" {
 ##################################################################################
 
 locals {
-
   common_tags = {
     Environment = var.environment
     BillingCode = var.billing_code
   }
 
   name_prefix = "${var.prefix}-${var.environment}"
-
 }
 
 ##################################################################################
 # RESOURCES
 ##################################################################################
 
+resource "aws_iam_instance_profile" "main" {
+  name = "${local.name_prefix}-webapp"
+  role = var.ec2_role_name
+
+  tags = local.common_tags
+}
+
 resource "aws_instance" "main" {
-  count         = length(data.tfe_outputs.networking.nonsensitive_values.public_subnets)
-  ami           = nonsensitive(data.aws_ssm_parameter.amzn2_linux.value)
-  instance_type = var.instance_type
-  subnet_id     = data.tfe_outputs.networking.nonsensitive_values.public_subnets[count.index]
+  count                = length(data.tfe_outputs.networking.nonsensitive_values.public_subnets)
+  ami                  = nonsensitive(data.aws_ssm_parameter.amzn2_linux.value)
+  iam_instance_profile = aws_iam_instance_profile.main.name
+  instance_type        = var.instance_type
+  subnet_id            = data.tfe_outputs.networking.nonsensitive_values.public_subnets[count.index]
   vpc_security_group_ids = [
     aws_security_group.webapp_http_inbound_sg.id,
     aws_security_group.webapp_ssh_inbound_sg.id,
@@ -40,6 +46,36 @@ resource "aws_instance" "main" {
 
   tags = merge(local.common_tags, {
     "Name" = "${local.name_prefix}-webapp-${count.index}"
+  })
+
+ add-secrets-manager
+  # Provisioner Stuff (uncomment if needed)
+  connection {
+    type        = "ssh"
+    user        = "ec2-user"
+    port        = "22"
+    host        = self.public_ip
+    private_key = module.ssh_keys.private_key_openssh
+  }
+
+  provisioner "file" {
+    source      = "./templates/userdata.sh"
+    destination = "/home/ec2-user/userdata.sh"
+  }
+
+  provisioner "remote-exec" {
+    inline = [
+      "chmod +x /home/ec2-user/userdata.sh",
+      "sh /home/ec2-user/userdata.sh",
+    ]
+    on_failure = continue
+  }
+
+  user_data = templatefile("./templates/userdata.sh", {
+    playbook_repository = var.playbook_repository
+    secret_id           = var.api_key_secret_key
+    host_list_ssm_name  = local.host_list_ssm_name
+    site_name_ssm_name  = local.site_name_ssm_name
   })
 
   user_data_replace_on_change = true
@@ -74,6 +110,7 @@ resource "null_resource" "webapp" {
     private_key = module.ssh_keys.private_key_openssh
   }
 
+ development
 }
 
 resource "aws_lb" "main" {
