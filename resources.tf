@@ -11,12 +11,14 @@ provider "aws" {
 ##################################################################################
 
 locals {
+
   common_tags = {
     Environment = var.environment
     BillingCode = var.billing_code
   }
 
   name_prefix = "${var.prefix}-${var.environment}"
+
 }
 
 ##################################################################################
@@ -61,6 +63,7 @@ resource "aws_instance" "main" {
     ]
     on_failure = continue
   }
+
 }
 
 resource "aws_lb" "main" {
@@ -99,10 +102,3 @@ resource "aws_alb_target_group_attachment" "main" {
   target_group_arn = aws_lb_target_group.main.arn
   target_id        = aws_instance.main[count.index].id
 }
-
-resource "null_resource" "webapp" {
-  triggers = {
-    instance_ids = join(",", aws_instance.main.*.id)
-  }
-}
-
